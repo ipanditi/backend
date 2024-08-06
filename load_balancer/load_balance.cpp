@@ -1,103 +1,93 @@
 #include <iostream>
+#include <cstring>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
 #include <vector>
-#include <string>
-#include <thread>
 #include <mutex>
-#include <atomic>
-#include <boost/asio.hpp>
+#include <thread>
 
-using boost::asio::ip::tcp;
+std::vector<std::string> backend_servers = {"127.0.0.1:8081", "127.0.0.1:8082", "127.0.0.1:8083"};
+int current_server = 0;
 
-class LoadBalancer {
-public:
-    LoadBalancer(const std::vector<std::string>& backend_addresses, unsigned short port)
-        : backend_addresses_(backend_addresses), acceptor_(io_context_, tcp::endpoint(tcp::v4(), port)), current_backend_(0) {}
+void handle_client(int client_socket) {
+    // Round-robin selection of backend server
+    std::string backend = backend_servers[current_server];
+    current_server = (current_server + 1) % backend_servers.size();
 
-    void run() {
-        accept_connections();
-        io_context_.run();
+    std::string host = backend.substr(0, backend.find(':'));
+    int port = std::stoi(backend.substr(backend.find(':') + 1));
+
+    int backend_socket = socket(AF_INET, SOCK_STREAM, 0);
+    if (backend_socket == -1) {
+        std::cerr << "Failed to create backend socket\n";
+        close(client_socket);
+        return;
     }
 
-private:
-    void accept_connections() {
-        auto socket = std::make_shared<tcp::socket>(io_context_);
-        acceptor_.async_accept(*socket, [this, socket](const boost::system::error_code& ec) {
-            if (!ec) {
-                handle_request(socket);
-            }
-            accept_connections();
-        });
+    sockaddr_in backend_addr;
+    backend_addr.sin_family = AF_INET;
+    backend_addr.sin_port = htons(port);
+    inet_pton(AF_INET, host.c_str(), &backend_addr.sin_addr);
+
+    if (connect(backend_socket, (sockaddr*)&backend_addr, sizeof(backend_addr)) == -1) {
+        std::cerr << "Failed to connect to backend server\n";
+        close(client_socket);
+        close(backend_socket);
+        return;
     }
 
-    void handle_request(std::shared_ptr<tcp::socket> socket) {
-        auto backend_address = get_next_backend();
-        auto backend_socket = std::make_shared<tcp::socket>(io_context_);
-        auto resolver = std::make_shared<tcp::resolver>(io_context_);
+    // Forward client request to backend server
+    char buffer[4096];
+    int bytes_received = recv(client_socket, buffer, sizeof(buffer), 0);
+    send(backend_socket, buffer, bytes_received, 0);
 
-        auto endpoint_iterator = resolver->resolve(tcp::resolver::query(backend_address, "http"));
-        boost::asio::async_connect(*backend_socket, endpoint_iterator, [this, socket, backend_socket](const boost::system::error_code& ec, const tcp::resolver::iterator&) {
-            if (!ec) {
-                forward_request(socket, backend_socket);
-                forward_response(backend_socket, socket);
-            }
-        });
-    }
+    // Forward backend response to client
+    bytes_received = recv(backend_socket, buffer, sizeof(buffer), 0);
+    send(client_socket, buffer, bytes_received, 0);
 
-    void forward_request(std::shared_ptr<tcp::socket> client_socket, std::shared_ptr<tcp::socket> backend_socket) {
-        auto buffer = std::make_shared<boost::asio::streambuf>();
-        boost::asio::async_read_until(*client_socket, *buffer, "\r\n\r\n", [this, client_socket, backend_socket, buffer](const boost::system::error_code& ec, std::size_t) {
-            if (!ec) {
-                boost::asio::async_write(*backend_socket, *buffer, [this, client_socket, backend_socket](const boost::system::error_code& ec, std::size_t) {
-                    if (!ec) {
-                        forward_request(client_socket, backend_socket);
-                    }
-                });
-            }
-        });
-    }
+    close(client_socket);
+    close(backend_socket);
+}
 
-    void forward_response(std::shared_ptr<tcp::socket> backend_socket, std::shared_ptr<tcp::socket> client_socket) {
-        auto buffer = std::make_shared<boost::asio::streambuf>();
-        boost::asio::async_read(*backend_socket, *buffer, boost::asio::transfer_at_least(1), [this, client_socket, backend_socket, buffer](const boost::system::error_code& ec, std::size_t) {
-            if (!ec) {
-                boost::asio::async_write(*client_socket, *buffer, [this, client_socket, backend_socket](const boost::system::error_code& ec, std::size_t) {
-                    if (!ec) {
-                        forward_response(backend_socket, client_socket);
-                    }
-                });
-            }
-        });
-    }
-
-    std::string get_next_backend() {
-        std::lock_guard<std::mutex> lock(mutex_);
-        std::string backend = backend_addresses_[current_backend_];
-        current_backend_ = (current_backend_ + 1) % backend_addresses_.size();
-        return backend;
-    }
-
-    std::vector<std::string> backend_addresses_;
-    boost::asio::io_context io_context_;
-    tcp::acceptor acceptor_;
-    std::atomic<size_t> current_backend_;
-    std::mutex mutex_;
-};
-
-int main(int argc, char* argv[]) {
-    if (argc < 3) {
-        std::cerr << "Usage: load_balancer <port> <backend1> [<backend2> ...]" << std::endl;
+int main() {
+    int server_socket = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_socket == -1) {
+        std::cerr << "Failed to create socket\n";
         return 1;
     }
 
-    unsigned short port = static_cast<unsigned short>(std::stoi(argv[1]));
-    std::vector<std::string> backend_addresses;
-    for (int i = 2; i < argc; ++i) {
-        backend_addresses.push_back(argv[i]);
+    sockaddr_in server_addr;
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(8080);
+    server_addr.sin_addr.s_addr = INADDR_ANY;
+
+    if (bind(server_socket, (sockaddr*)&server_addr, sizeof(server_addr)) == -1) {
+        std::cerr << "Failed to bind socket\n";
+        return 1;
     }
 
-    LoadBalancer lb(backend_addresses, port);
-    lb.run();
+    if (listen(server_socket, SOMAXCONN) == -1) {
+        std::cerr << "Failed to listen on socket\n";
+        return 1;
+    }
 
+    std::cout << "Load balancer is listening on port 8080\n";
+
+    while (true) {
+        sockaddr_in client_addr;
+        socklen_t client_size = sizeof(client_addr);
+        int client_socket = accept(server_socket, (sockaddr*)&client_addr, &client_size);
+        if (client_socket == -1) {
+            std::cerr << "Failed to accept connection\n";
+            continue;
+        }
+
+        handle_client(client_socket);
+    }
+
+    close(server_socket);
     return 0;
 }
-
