@@ -100,12 +100,14 @@ void handle_client(int client_socket) {
     int bytes_received = recv(client_socket, buffer, sizeof(buffer), 0);
     if (bytes_received > 0) {
         send(backend_socket, buffer, bytes_received, 0);
+	std::cout<<"Sent to server"<<std::endl;
     }
 
     // Forward backend response to client
     bytes_received = recv(backend_socket, buffer, sizeof(buffer), 0);
     if (bytes_received > 0) {
         send(client_socket, buffer, bytes_received, 0);
+	std::cout<<"Received from server"<<std::endl;
     }
 
     close(client_socket);
