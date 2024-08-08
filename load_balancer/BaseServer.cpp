@@ -36,7 +36,12 @@ int BaseServer::createServerSocket() {
         perror("socket");
         return -1;
     }
-
+    int opt = 1;
+    if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == -1) {
+        perror("setsockopt");
+        close(sock);
+        return -1;
+    }
     sockaddr_in serverAddr;
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_port = htons(port);
