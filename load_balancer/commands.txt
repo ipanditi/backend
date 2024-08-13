@@ -1,0 +1,5 @@
+
+g++ -std=c++17 -pthread -o advanced_load_balancer advanced_load_balancer.cpp
+
+#Stress Testing
+The Load Balancer can handle upto 7000 requests from client

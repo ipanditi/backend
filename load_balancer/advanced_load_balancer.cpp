@@ -94,7 +94,7 @@ std::mutex server_mutex;
 LoadBalancingAlgorithm* current_algorithm = nullptr;
 
 
-std::ofstream log_file("traffic_log.csv");
+std::ofstream log_file("traffic_log.csv", std::ios::app);
 
 void log_to_csv(const std::string& timestamp, const std::string& server, const std::string& algorithm) {
     if (log_file.is_open()) {
@@ -163,7 +163,7 @@ void monitor_and_adapt() {
         bool traffic_spike = std::accumulate(active_connections.begin(), active_connections.end(), 0,
                                              [](int sum, const std::pair<std::string, int>& kv) {
                                                  return sum + kv.second;
-                                             }) > 10;
+                                             }) > 5;
 
         delete current_algorithm;
 

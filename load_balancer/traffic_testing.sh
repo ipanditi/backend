@@ -10,7 +10,7 @@ round_robin(){
 # Send a burst of requests to load balancer which will distribute them
 # If Least Connections algorithm is triggered, it should prefer servers with fewer connections
 least_connections(){
-   for i in {1..1000}
+   for i in {1..10000}
    do
        curl -s http://127.0.0.1:8080 -o /dev/null &
    done
