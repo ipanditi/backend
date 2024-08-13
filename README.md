@@ -10,5 +10,6 @@
 
 # To Be Implemented:
 1. Robust implementation of addition of servers
-2. Make the server IPs dynamic
+2. Store Config files in an environment database like RocksDB for high performance (built with C++)
+3. Make the server IPs dynamic
 
