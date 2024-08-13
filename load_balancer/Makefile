@@ -60,7 +60,7 @@ run: $(LOAD_BALANCER) $(SERVER1) $(SERVER2) $(SERVER3)
 	pkill -f $(SERVER2)
 	pkill -f $(SERVER3)
 	pkill -f $(LOAD_BALANCER)
-
+	cat network_traffic_log.csv
 #rebuild
 rebuild: clean all
 

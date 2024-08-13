@@ -1,12 +1,25 @@
+# Use an official C++ base image
 FROM gcc:latest
 
-#Install Boost Libraries
-RUN apt-get update && apt-get install -y libboost-all-dev
-
-COPY . /app
+# Set the working directory in the container
 WORKDIR /app
 
-RUN g++ -o load_balancer load_balancer.cpp -lbboost_system -lpthread
+# Install necessary packages
+RUN apt-get update && \
+    apt-get install -y cmake make g++ curl
 
-CMD ["./load_balancer", "8080", "backend1:8080", "backend2:8080"]
+# Copy all source files to the container
+COPY . /app
+
+# Compile the code
+RUN make rebuild
+
+# Expose ports for the load balancer and servers
+EXPOSE 8080
+EXPOSE 8081
+EXPOSE 8082
+EXPOSE 8083
+
+# Run the load balancer
+CMD ["make", "run"]
 

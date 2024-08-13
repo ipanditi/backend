@@ -19,6 +19,7 @@
 #include <fstream>
 #include <ctime>
 #include <iomanip>
+#include <chrono>
 
 class LoadBalancingAlgorithm {
 public:
@@ -93,7 +94,7 @@ std::mutex server_mutex;
 LoadBalancingAlgorithm* current_algorithm = nullptr;
 
 
-std::ofstream log_file("network_traffic_log.csv");
+std::ofstream log_file("traffic_log.csv");
 
 void log_to_csv(const std::string& timestamp, const std::string& server, const std::string& algorithm) {
     if (log_file.is_open()) {
