@@ -16,6 +16,11 @@
 #include <algorithm>
 #include <numeric>
 #include <climits>
+#include <fstream>
+#include <ctime>
+#include <iomanip>
+#include <chrono>
+
 class LoadBalancingAlgorithm {
 public:
     virtual ~LoadBalancingAlgorithm() {}
@@ -82,11 +87,22 @@ private:
 };
 
 // Global variables
-std::vector<std::string> backend_servers = {"127.0.0.1:8081", "127.0.0.1:8082", "127.0.0.1:8083"};
+std::vector<std::string> backend_servers = {"127.0.0.1:8084", "127.0.0.1:8082", "127.0.0.1:8083"};
 std::map<std::string, int> server_metrics;
 std::map<std::string, int> active_connections;
 std::mutex server_mutex;
 LoadBalancingAlgorithm* current_algorithm = nullptr;
+
+
+std::ofstream log_file("traffic_log.csv");
+
+void log_to_csv(const std::string& timestamp, const std::string& server, const std::string& algorithm) {
+    if (log_file.is_open()) {
+        log_file << timestamp << "," << server << "," << algorithm << "\n";
+    } else {
+        std::cerr << "Failed to open log file\n";
+    }
+}
 
 std::pair<bool, int> is_server_healthy(const std::string& host, int port) {
     int sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -111,7 +127,7 @@ std::pair<bool, int> is_server_healthy(const std::string& host, int port) {
 
 void monitor_and_adapt() {
     while (true) {
-	backend_servers = {"127.0.0.1:8081","127.0.0.1:8082","127.0.0.1:8083"};
+	backend_servers = {"127.0.0.1:8084","127.0.0.1:8082","127.0.0.1:8083"};
         std::this_thread::sleep_for(std::chrono::seconds(5));
 
         // Update server health status and active connections
@@ -147,7 +163,7 @@ void monitor_and_adapt() {
         bool traffic_spike = std::accumulate(active_connections.begin(), active_connections.end(), 0,
                                              [](int sum, const std::pair<std::string, int>& kv) {
                                                  return sum + kv.second;
-                                             }) > 50;
+                                             }) > 10;
 
         delete current_algorithm;
 
@@ -173,6 +189,8 @@ void handle_client(int client_socket) {
     int port;
     int backend_socket = -1;
     bool server_healthy = false;
+    std::string selected_server;
+    std::string algorithm_name = typeid(*current_algorithm).name();
 
     while (true) {
         server_mutex.lock();
@@ -227,6 +245,12 @@ void handle_client(int client_socket) {
         close(client_socket);
         return;
     }
+
+    auto now = std::chrono::system_clock::now();
+    auto time = std::chrono::system_clock::to_time_t(now);
+    std::stringstream timestamp;
+    timestamp << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    log_to_csv(timestamp.str(), selected_server, algorithm_name);
 
     // Relay traffic between client and backend
     fd_set readfds;
@@ -323,6 +347,7 @@ int main() {
     // Cleanup
     delete current_algorithm;
     close(server_socket);
+    log_file.close();
     return 0;
 }
 
