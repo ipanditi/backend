@@ -1,5 +1,9 @@
 
 g++ -std=c++17 -pthread -o advanced_load_balancer advanced_load_balancer.cpp
 
+g++ -o server1 BaseServer.cpp Server1.cpp -std=c++11
+g++ -o server2 BaseServer.cpp Server2.cpp -std=c++11
+g++ -o server3 BaseServer.cpp Server3.cpp -std=c++11
+
 #Stress Testing
 The Load Balancer can handle upto 7000 requests from client

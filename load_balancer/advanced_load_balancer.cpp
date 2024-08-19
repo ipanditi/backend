@@ -20,6 +20,10 @@
 #include <ctime>
 #include <iomanip>
 #include <chrono>
+#include <stack>
+#include <signal.h>
+#include <sys/wait.h>
+
 
 class LoadBalancingAlgorithm {
 public:
@@ -98,7 +102,9 @@ std::map<std::string, int> server_metrics;
 std::map<std::string, int> active_connections;
 std::mutex server_mutex;
 LoadBalancingAlgorithm* current_algorithm = nullptr;
-
+std::stack<int> processStack;  // To maintain the stack of server processes
+std::vector<int> ports = {8085, 8086, 8087, 8088, 8089, 8090, 8091};
+int max_servers = 10;
 
 std::ofstream log_file("traffic_log.csv", std::ios::app);
 
@@ -130,11 +136,106 @@ std::pair<bool, int> is_server_healthy(const std::string& host, int port) {
     std::cout << "Health check for server " << host << ":" << port << " - " << (healthy ? "Healthy" : "Unhealthy") << std::endl;
     return {healthy, result};  // Return whether healthy and the result of connect
 }
+/*
+void startServer(int port){
+   pid_t pid = fork();
+   if(pid==0){
+      std::string executable = "./server" + std::to_string(port);
+      execlp(executable.c_str(), executable.c_str(),(char*)NULL);
+      _exit(1);
+   }
+   else if(pid >0){
+      std::string new_server = "127.0.0.1:" + std::to_string(port);
+      std::cout << "Started server on port " << port << " with PID " << pid << std::endl;
+      active_connections[new_server] = 0;
+      processStack.push(pid);
+    } else {
+        std::cerr << "Failed to fork a new server process on port " << port << std::endl;
+    }
+}
+*/
+void startServer(int port) {
+    pid_t pid = fork();
+    if (pid == 0) {
+        std::string executable = "./server1";
+        execlp("/home/vivek/project/backend/load_balancer/server1", "server1", (char*)NULL);
+        _exit(1);
+    } else if (pid > 0) {
+        std::string new_server = "127.0.0.1:" + std::to_string(port);
+        std::cout << "Started server on port " << port << " with PID " << pid << std::endl;
 
+        // Retry mechanism to check if the server becomes healthy
+        bool server_added = false;
+        for (int i = 0; i < 5; ++i) {  // Retry up to 5 times
+            std::this_thread::sleep_for(std::chrono::seconds(2));
+	    auto [healthy, _] = is_server_healthy("127.0.0.1", port);
+            if (healthy) {
+                // If healthy, add to active connections and process stack
+                active_connections[new_server] = 0;
+                processStack.push(pid);
+
+                // Add the new server to the backend servers list
+                server_mutex.lock();
+                backend_servers.push_back(new_server);
+                server_mutex.unlock();
+
+                server_added = true;
+                break;
+            } else {
+                std::cerr << "Newly started server on port " << port << " is initially unhealthy, retrying... (" << (i + 1) << "/5)\n";
+                std::this_thread::sleep_for(std::chrono::seconds(2));  // Wait before retrying
+            }
+        }
+
+        if (!server_added) {
+            std::cerr << "Server on port " << port << " remained unhealthy after retries and will not be added to the pool.\n";
+            kill(pid, SIGTERM);
+            waitpid(pid, nullptr, 0);
+        }
+    } else {
+        std::cerr << "Failed to fork a new server process on port " << port << std::endl;
+    }
+}
+
+void stopServer(){
+   if(!processStack.empty()){
+      pid_t pid = processStack.top();
+      processStack.pop();
+      kill(pid,SIGTERM);
+      waitpid(pid, nullptr,0);
+      std::cout<< "Stopped Server with PID" <<pid<<std::endl;
+   }
+   else{
+      std::cerr << "No servers to stop" << std::endl;
+    }
+}
+double getAverageCPUUsage() {
+    double loadavg;
+    if (getloadavg(&loadavg, 1) != -1) {
+        return loadavg * 100 / sysconf(_SC_NPROCESSORS_ONLN);
+    } else {
+        std::cerr << "Failed to get CPU usage" << std::endl;
+        return 0;
+    }
+}
 void monitor_and_adapt() {
     while (true) {
-	backend_servers = {"127.0.0.1:8084","127.0.0.1:8082","127.0.0.1:8083"};
+//	backend_servers = {"127.0.0.1:8084","127.0.0.1:8082","127.0.0.1:8083","127.0.0.1:8081","127.0.0.1:8085","127.0.0.1:8086","127.0.0.1:8087","127.0.0.1:8088","127.0.0.1:8089"};
         std::this_thread::sleep_for(std::chrono::seconds(5));
+	double avg_cpu_usage = getAverageCPUUsage();
+	if (avg_cpu_usage > 80.0 && backend_servers.size() < 10) {
+            int new_port = ports[processStack.size()];
+	    std::cout << "Current CPU usage: " << avg_cpu_usage << "%" << std::endl;
+            startServer(new_port);
+            server_mutex.lock();
+            backend_servers.push_back("127.0.0.1:" + std::to_string(new_port));
+            server_mutex.unlock();
+        } else if (avg_cpu_usage < 20 && processStack.size() > 3) {
+            stopServer();
+            server_mutex.lock();
+            backend_servers.pop_back();  // Remove the last server from the list
+            server_mutex.unlock();
+        }
 
         // Update server health status and active connections
         std::map<std::string, bool> health_status;
