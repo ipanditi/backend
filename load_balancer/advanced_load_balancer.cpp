@@ -47,10 +47,16 @@ public:
         std::string best_server;
         int min_connections = INT_MAX;
         for (const auto& server : servers) {
-            int connections = active_connections.at(server);
-            if (connections < min_connections) {
-                min_connections = connections;
-                best_server = server;
+	    auto it  = active_connections.find(server);
+            if(it!= active_connections.end()){
+		int connections = it->second;
+	   	if (connections < min_connections) {
+                   min_connections = connections;
+                   best_server = server;
+		}
+		else{
+		   std::cerr << "Warning: Server " << server << " not found in active connections.\n";
+   		}
             }
         }
         std::cout << "LeastConnections selected server: " << best_server << std::endl;
@@ -195,7 +201,8 @@ void handle_client(int client_socket) {
     while (true) {
         server_mutex.lock();
         backend = current_algorithm->selectServer(backend_servers);
-        server_mutex.unlock();
+        //active_connections[backend]++;
+	server_mutex.unlock();
 
         host = backend.substr(0, backend.find(':'));
         port = std::stoi(backend.substr(backend.find(':') + 1));
@@ -291,7 +298,6 @@ void handle_client(int client_socket) {
     server_mutex.lock();
     active_connections[backend]--;
     server_mutex.unlock();
-
     close(client_socket);
     close(backend_socket);
 }
