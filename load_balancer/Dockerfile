@@ -1,4 +1,3 @@
-# Use an official C++ base image
 FROM gcc:latest
 
 # Set the working directory in the container
@@ -11,15 +10,20 @@ RUN apt-get update && \
 # Copy all source files to the container
 COPY . /app
 
-# Compile the code
-RUN make rebuild
+# Compile the load balancer
+#RUN g++ -o advanced_load_balancer advanced_load_balancer.cpp -lboost_system -pthread
+RUN g++ -std=c++17 -pthread -o advanced_load_balancer advanced_load_balancer.cpp
 
-# Expose ports for the load balancer and servers
+# Make port 8080 available to the world outside this container
 EXPOSE 8080
-EXPOSE 8081
+EXPOSE 8084
 EXPOSE 8082
 EXPOSE 8083
+EXPOSE 8081 
 
-# Run the load balancer
-CMD ["make", "run"]
+# Define environment variable
+ENV NAME World
+
+# Run the load balancer when the container launches
+CMD ["./advanced_load_balancer"]
 
