@@ -220,7 +220,7 @@ double getAverageCPUUsage() {
 }
 void monitor_and_adapt() {
     while (true) {
-//	backend_servers = {"127.0.0.1:8084","127.0.0.1:8082","127.0.0.1:8083","127.0.0.1:8081","127.0.0.1:8085","127.0.0.1:8086","127.0.0.1:8087","127.0.0.1:8088","127.0.0.1:8089"};
+	backend_servers = {"127.0.0.1:8084","127.0.0.1:8082","127.0.0.1:8083"};
         std::this_thread::sleep_for(std::chrono::seconds(5));
 	double avg_cpu_usage = getAverageCPUUsage();
 	if (avg_cpu_usage > 80.0 && backend_servers.size() < 10) {
