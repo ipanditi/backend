@@ -7,9 +7,11 @@
     2. Least Connections: Routes traffic to the server with the fewest active connections.
     3. Weighted Round Robin: 
 5. Traffic logs are dumped in a csv for further analysis.
+6. Dockerized, now available as a Service (LaaS)
 
-# To Be Implemented:
-1. Robust implementation of addition of servers
-2. Store Config files in an environment database like RocksDB for high performance (built with C++)
-3. Make the server IPs dynamic
+# To be implemented
+1. Build a distributed file server using Go.
+2. Video Transcoding using FFmPeg.
+3. Real time streaming using NGINX and RTMP.
+4. Way to go!
 
