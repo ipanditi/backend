@@ -1,15 +1,41 @@
 version: '3.3'
 
 services:
-  load_balancer_1:
-    image: custom-load-balancer:latest
+  load_balancer:
+    build: .
     network_mode: "host"
     ports:
-    - "8080:8080"  # Maps host port 8081 to container port 8080
+      - "8080:8080"
 
-  load_balancer_2:
-    image: custom-load-balancer:latest
-    network_mode: "host"
+  server1:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
     ports:
-    - "8085:8080"  # Maps host port 8082 to container port 8080
+      - "8084:8084"
+  server2:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    ports:
+      - "8082:8084"
+  server3:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    ports:
+      - "8083:8084"
 
+
+#version: '3.3'
+
+#services:
+# load_balancer:
+#   image: custom-load-balancer:latest
+#   networks:
+#   - load_balancer
+#   expose:
+#   - "8080"  # Maps host port 8081 to container port 8080
+#networks:
+# load_balancer:
+#   driver: host
