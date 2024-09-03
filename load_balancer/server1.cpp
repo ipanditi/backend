@@ -1,9 +1,11 @@
 #include "BaseServer.h"
 #include <iostream>
 #include <unistd.h>
+#include <cstdlib>
+
 class Server1 : public BaseServer {
 public:
-    Server1() : BaseServer(8084) {}
+    Server1(int port) : BaseServer(port) {}
 
 protected:
     void handleClient(int clientSocket) override {
@@ -21,8 +23,19 @@ protected:
     }
 };
 
-int main() {
-    Server1 server;
+int main(int argc, char* argv[]) {
+    // Set default port or get from environment variable
+    int port = 8084; // default port
+
+    if (const char* envPort = std::getenv("SERVER_PORT")) {
+        port = std::atoi(envPort);
+    }
+
+    // Or accept port as a command-line argument
+    if (argc > 1) {
+        port = std::atoi(argv[1]);
+    }
+    Server1 server(port);
     server.start();
     return 0;
 }

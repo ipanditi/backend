@@ -6,6 +6,10 @@ services:
     network_mode: "host"
     ports:
       - "8080:8080"
+    depends_on:
+      - server1
+      - server2
+      - server3
 
   server1:
     build:
@@ -13,18 +17,27 @@ services:
       dockerfile: Dockerfile.server
     ports:
       - "8084:8084"
+    environment:
+      - SERVER_PORT=8084
+
   server2:
     build:
       context: .
       dockerfile: Dockerfile.server
     ports:
       - "8082:8084"
+    environment:
+      - SERVER_PORT=8082
+
   server3:
     build:
       context: .
       dockerfile: Dockerfile.server
     ports:
-      - "8083:8084"
+      - "8083:8084"  
+    environment:
+      - SERVER_PORT=8083
+
 
 
 #version: '3.3'

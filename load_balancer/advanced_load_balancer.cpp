@@ -93,7 +93,7 @@ private:
 };
 
 // Global variables
-std::vector<std::string> backend_servers = {"127.0.0.1:8084", "127.0.0.1:8082", "127.0.0.1:8083"};
+std::vector<std::string> backend_servers = {"load_balancer_server1:8084", "load_balancer_server2:8082", "load_balancer_server3:8083"};
 std::map<std::string, int> server_metrics;
 std::map<std::string, int> active_connections;
 std::mutex server_mutex;
@@ -133,7 +133,7 @@ std::pair<bool, int> is_server_healthy(const std::string& host, int port) {
 
 void monitor_and_adapt() {
     while (true) {
-	backend_servers = {"127.0.0.1:8084","127.0.0.1:8082","127.0.0.1:8083"};
+	backend_servers = {"load_balancer_server1:8084","load_balancer_server2:8082","load_balancer_server3:8083"};
         std::this_thread::sleep_for(std::chrono::seconds(5));
 
         // Update server health status and active connections
